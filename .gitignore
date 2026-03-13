@@ -1,0 +1,22 @@
+.DS_Store
+node_modules/
+.expo/
+.expo-shared/
+*.log
+.env
+.env.*
+python/__pycache__/
+**/__pycache__/
+*.pyc
+
+# Expo
+web-build/
+dist/
+
+# macOS
+.AppleDouble
+.LSOverride
+
+# IDE
+.vscode/
+.idea/
