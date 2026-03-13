@@ -1,16 +1,158 @@
-import { Text, StyleSheet } from "react-native";
+import { useEffect, useState } from "react";
+import { Text, StyleSheet, ScrollView, View, TextInput } from "react-native";
+import { useSelector } from "react-redux";
 import { colors } from "../theme/colors";
 import { spacing } from "../theme/spacing";
 import { typography } from "../theme/typography";
 import PrimaryButton from "../components/PrimaryButton";
 import PageCard from "../components/PageCard";
+import PlaceCard from "../components/PlaceCard";
+import { deletePlace, fetchPlaces, updatePlace } from "../services/placesApi";
+import { toDisplayImageUrl } from "../services/mediaUrl";
 
 export default function ListingsScreen({ navigation }) {
+  const role = useSelector((state) => state.auth.role);
+  const [places, setPlaces] = useState([]);
+  const [editingId, setEditingId] = useState(null);
+  const [form, setForm] = useState({ name: "", category: "", district_id: "", description: "" });
+  const [status, setStatus] = useState("idle");
+  const [error, setError] = useState("");
+
+  const categoryLabel = (value) => {
+    const mapping = {
+      restaurant: "Food",
+      stay: "Stay",
+      generational_shop: "Shops",
+      hidden_gem: "Hidden Gems",
+      tourist_place: "Tourist",
+    };
+    return mapping[value] || value;
+  };
+
+  const loadPlaces = () => {
+    fetchPlaces()
+      .then((data) => setPlaces(data || []))
+      .catch(() => setPlaces([]));
+  };
+
+  useEffect(() => {
+    loadPlaces();
+  }, []);
+
+  const startEdit = (place) => {
+    setEditingId(place.id);
+    setForm({
+      name: place.name || "",
+      category: place.category || "",
+      district_id: String(place.district_id || ""),
+      description: place.description || "",
+    });
+  };
+
+  const saveEdit = async () => {
+    if (!editingId) return;
+    setStatus("saving");
+    setError("");
+    try {
+      await updatePlace(editingId, {
+        name: form.name,
+        category: form.category,
+        district_id: Number(form.district_id) || undefined,
+        description: form.description,
+      });
+      setEditingId(null);
+      loadPlaces();
+    } catch (e) {
+      setError(e.message || "Update failed");
+    } finally {
+      setStatus("idle");
+    }
+  };
+
+  const handleDelete = async (id) => {
+    setStatus("deleting");
+    setError("");
+    try {
+      await deletePlace(id);
+      loadPlaces();
+    } catch (e) {
+      setError(e.message || "Delete failed");
+    } finally {
+      setStatus("idle");
+    }
+  };
+
   return (
     <PageCard>
       <Text style={styles.title}>Listings</Text>
       <Text style={styles.text}>Browse curated places and businesses.</Text>
       <PrimaryButton label="Search & Filter" onPress={() => navigation.navigate("SearchFilter")} />
+
+      {role === "admin" ? (
+        <ScrollView style={styles.list}>
+          {error ? <Text style={styles.error}>{error}</Text> : null}
+          {places.map((p) => (
+            <View key={p.id} style={styles.adminCard}>
+              <Text style={styles.adminTitle}>{p.name}</Text>
+              <Text style={styles.adminMeta}>
+                {categoryLabel(p.category)} • District {p.district_id}
+              </Text>
+              <View style={styles.adminButtons}>
+                <PrimaryButton label="Edit" onPress={() => startEdit(p)} />
+                <PrimaryButton label="Delete" onPress={() => handleDelete(p.id)} variant="ghost" />
+              </View>
+              {editingId === p.id ? (
+                <View style={styles.editPanel}>
+                  <TextInput
+                    style={styles.input}
+                    value={form.name}
+                    onChangeText={(v) => setForm({ ...form, name: v })}
+                    placeholder="Name"
+                  />
+                  <TextInput
+                    style={styles.input}
+                    value={form.category}
+                    onChangeText={(v) => setForm({ ...form, category: v })}
+                    placeholder="Category (restaurant, stay, etc)"
+                  />
+                  <TextInput
+                    style={styles.input}
+                    value={form.district_id}
+                    onChangeText={(v) => setForm({ ...form, district_id: v })}
+                    placeholder="District ID"
+                    keyboardType="numeric"
+                  />
+                  <TextInput
+                    style={[styles.input, styles.textArea]}
+                    value={form.description}
+                    onChangeText={(v) => setForm({ ...form, description: v })}
+                    placeholder="Description"
+                    multiline
+                  />
+                  <PrimaryButton
+                    label={status === "saving" ? "Saving..." : "Save"}
+                    onPress={saveEdit}
+                  />
+                </View>
+              ) : null}
+            </View>
+          ))}
+        </ScrollView>
+      ) : (
+        <ScrollView style={styles.list}>
+          {places.map((p) => (
+            <PlaceCard
+              key={p.id}
+              name={p.name}
+              category={categoryLabel(p.category)}
+              distance={p.distance}
+              rating={p.avg_rating ?? p.rating}
+              imageUrl={toDisplayImageUrl(p.image_urls?.[0])}
+              onPress={() => navigation.navigate("PlaceDetail", { id: p.id })}
+            />
+          ))}
+        </ScrollView>
+      )}
     </PageCard>
   );
 }
@@ -25,5 +167,49 @@ const styles = StyleSheet.create({
     ...typography.body,
     color: colors.textSecondary,
     marginBottom: spacing.xl,
+  },
+  list: {
+    marginTop: spacing.lg,
+  },
+  adminCard: {
+    backgroundColor: colors.surface,
+    borderRadius: 20,
+    padding: spacing.lg,
+    borderWidth: 1,
+    borderColor: colors.border,
+    marginBottom: spacing.lg,
+  },
+  adminTitle: {
+    ...typography.h3,
+    color: colors.text,
+  },
+  adminMeta: {
+    ...typography.body,
+    color: colors.textSecondary,
+    marginTop: spacing.xs,
+    marginBottom: spacing.md,
+  },
+  adminButtons: {
+    flexDirection: "row",
+    gap: spacing.sm,
+    marginBottom: spacing.md,
+  },
+  editPanel: {
+    marginTop: spacing.md,
+    gap: spacing.sm,
+  },
+  input: {
+    backgroundColor: colors.background,
+    borderRadius: 12,
+    padding: spacing.md,
+    borderWidth: 1,
+    borderColor: colors.border,
+  },
+  textArea: {
+    height: 100,
+  },
+  error: {
+    color: colors.error || "#C0392B",
+    marginBottom: spacing.md,
   },
 });

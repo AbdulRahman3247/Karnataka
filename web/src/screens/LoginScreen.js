@@ -7,15 +7,28 @@ import { spacing } from "../theme/spacing";
 import { typography } from "../theme/typography";
 import PrimaryButton from "../components/PrimaryButton";
 import PageCard from "../components/PageCard";
+import { login as loginApi } from "../services/authApi";
+import { setAuthToken } from "../services/authStore";
 
 export default function LoginScreen({ navigation }) {
   const dispatch = useDispatch();
   const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
+  const [status, setStatus] = useState("idle");
+  const [error, setError] = useState("");
 
-  const handleLogin = () => {
-    const role = email.toLowerCase().endsWith("@admin.com") ? "admin" : "user";
-    dispatch(login({ user: { email }, role }));
-    // Navigation will be handled by RootNavigator based on state
+  const handleLogin = async () => {
+    setStatus("loading");
+    setError("");
+    try {
+      const data = await loginApi({ email, password });
+      setAuthToken(data.access_token);
+      dispatch(login({ user: data.user, role: data.user.role, token: data.access_token }));
+    } catch (e) {
+      setError(e.message || "Login failed");
+    } finally {
+      setStatus("idle");
+    }
   };
 
   return (
@@ -24,7 +37,7 @@ export default function LoginScreen({ navigation }) {
       <Text style={styles.subtitle}>Sign in to continue your Karnataka journey.</Text>
 
       <TextInput
-        placeholder="Email (use @admin.com for admin)"
+        placeholder="Email"
         placeholderTextColor={colors.textMuted}
         style={styles.input}
         value={email}
@@ -36,9 +49,12 @@ export default function LoginScreen({ navigation }) {
         placeholderTextColor={colors.textMuted}
         secureTextEntry
         style={styles.input}
+        value={password}
+        onChangeText={setPassword}
       />
 
-      <PrimaryButton label="Login" onPress={handleLogin} />
+      {error ? <Text style={styles.error}>{error}</Text> : null}
+      <PrimaryButton label={status === "loading" ? "Signing in..." : "Login"} onPress={handleLogin} />
 
       <Text style={styles.helper}>New here?</Text>
       <PrimaryButton label="Create account" onPress={() => navigation.navigate("Register")} variant="ghost" />
@@ -87,6 +103,11 @@ const styles = StyleSheet.create({
     marginBottom: spacing.xs,
     color: colors.textMuted,
     fontSize: 12,
+    textAlign: "center",
+  },
+  error: {
+    color: colors.error || "#C0392B",
+    marginBottom: spacing.md,
     textAlign: "center",
   },
 });

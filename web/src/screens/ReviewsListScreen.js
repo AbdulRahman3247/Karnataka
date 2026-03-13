@@ -1,3 +1,4 @@
+import { useEffect, useState } from "react";
 import { View, Text, StyleSheet } from "react-native";
 import { useSelector } from "react-redux";
 import ScreenHeader from "../components/ScreenHeader";
@@ -6,10 +7,22 @@ import PageCard from "../components/PageCard";
 import { colors } from "../theme/colors";
 import { spacing } from "../theme/spacing";
 import { typography } from "../theme/typography";
+import { fetchReviews } from "../services/reviewsApi";
 
 export default function ReviewsListScreen({ navigation, route }) {
-  const placeId = route?.params?.id || "p3";
-  const reviews = useSelector((state) => state.reviews.reviewsByPlace[placeId] || []);
+  const placeParam = route?.params?.id;
+  const placeId = Number.isFinite(Number(placeParam)) ? Number(placeParam) : null;
+  const localReviews = useSelector((state) => state.reviews.reviewsByPlace[placeParam] || []);
+  const [remoteReviews, setRemoteReviews] = useState([]);
+
+  useEffect(() => {
+    if (!placeId) return;
+    fetchReviews(placeId)
+      .then((data) => setRemoteReviews(data || []))
+      .catch(() => {});
+  }, [placeId]);
+
+  const reviews = remoteReviews.length > 0 ? remoteReviews : localReviews;
 
   return (
     <PageCard>
@@ -19,14 +32,14 @@ export default function ReviewsListScreen({ navigation, route }) {
       ) : (
         reviews.map((r) => (
           <View key={r.id} style={styles.card}>
-            <Text style={styles.name}>{r.user}</Text>
+            <Text style={styles.name}>{r.user || r.user_id || "Guest"}</Text>
             <Text style={styles.meta}>Rating: {r.rating}</Text>
-            <Text style={styles.body}>{r.text}</Text>
+            <Text style={styles.body}>{r.text || r.comment || "(no text)"}</Text>
             {r.sentiment_label ? <Text style={styles.sentiment}>Sentiment: {r.sentiment_label}</Text> : null}
           </View>
         ))
       )}
-      <PrimaryButton label="Write a Review" onPress={() => navigation.navigate("ReviewSubmit", { id: placeId })} />
+      <PrimaryButton label="Write a Review" onPress={() => navigation.navigate("ReviewSubmit", { id: placeId || placeParam })} />
     </PageCard>
   );
 }

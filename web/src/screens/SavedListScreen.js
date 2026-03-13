@@ -1,16 +1,47 @@
+import { useCallback, useEffect, useState } from "react";
 import { Text, StyleSheet } from "react-native";
+import { useFocusEffect } from "@react-navigation/native";
 import { colors } from "../theme/colors";
-import { useSelector } from "react-redux";
 import ScreenHeader from "../components/ScreenHeader";
 import PlaceCard from "../components/PlaceCard";
 import PageCard from "../components/PageCard";
 import { spacing } from "../theme/spacing";
 import { typography } from "../theme/typography";
+import { fetchSavedPlaceCards } from "../services/savedApi";
+import { toDisplayImageUrl } from "../services/mediaUrl";
 
 export default function SavedListScreen({ navigation }) {
-  const savedIds = useSelector((state) => state.saved.saved);
-  const places = useSelector((state) => state.places.places);
-  const savedPlaces = places.filter((p) => savedIds.includes(p.id));
+  const [savedPlaces, setSavedPlaces] = useState([]);
+
+  const categoryLabel = (value) => {
+    const mapping = {
+      restaurant: "Food",
+      stay: "Stay",
+      generational_shop: "Shops",
+      hidden_gem: "Hidden Gems",
+      tourist_place: "Tourist",
+    };
+    return mapping[value] || value;
+  };
+
+  const load = useCallback(async () => {
+      try {
+        const places = await fetchSavedPlaceCards();
+        setSavedPlaces(places || []);
+      } catch (e) {
+        setSavedPlaces([]);
+      }
+    }, []);
+
+  useEffect(() => {
+    load();
+  }, [load]);
+
+  useFocusEffect(
+    useCallback(() => {
+      load();
+    }, [load])
+  );
 
   return (
     <PageCard>
@@ -19,7 +50,15 @@ export default function SavedListScreen({ navigation }) {
         <Text style={styles.text}>No saved places yet.</Text>
       ) : (
         savedPlaces.map((p) => (
-          <PlaceCard key={p.id} name={p.name} category={p.category} distance={p.distance} rating={p.rating} />
+          <PlaceCard
+            key={p.id}
+            name={p.name}
+            category={categoryLabel(p.category)}
+            distance={p.distance}
+            rating={p.avg_rating ?? p.rating}
+            imageUrl={toDisplayImageUrl(p.image_urls?.[0])}
+            onPress={() => navigation.navigate("PlaceDetail", { id: p.id })}
+          />
         ))
       )}
     </PageCard>

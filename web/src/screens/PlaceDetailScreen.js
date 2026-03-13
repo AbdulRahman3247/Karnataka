@@ -1,36 +1,122 @@
-import { View, Text, StyleSheet } from "react-native";
+import { useEffect, useState } from "react";
+import { View, Text, StyleSheet, Image, Alert } from "react-native";
 import { colors } from "../theme/colors";
-import { useDispatch, useSelector } from "react-redux";
 import ScreenHeader from "../components/ScreenHeader";
 import PrimaryButton from "../components/PrimaryButton";
 import PhotoPlaceholder from "../components/PhotoPlaceholder";
 import PageCard from "../components/PageCard";
 import { spacing } from "../theme/spacing";
 import { typography } from "../theme/typography";
-import { toggleSaved } from "../store/slices/savedSlice";
+import { fetchPlaceDetails } from "../services/placesApi";
+import { fetchSavedPlaces, removeSavedPlace, savePlace } from "../services/savedApi";
+import { toDisplayImageUrl } from "../services/mediaUrl";
 
 export default function PlaceDetailScreen({ navigation, route }) {
-  const placeId = route?.params?.id || "p3";
-  const dispatch = useDispatch();
-  const isSaved = useSelector((state) => state.saved.saved.includes(placeId));
+  const placeParam = route?.params?.id;
+  const placeId = Number.isFinite(Number(placeParam)) ? Number(placeParam) : null;
+  const [place, setPlace] = useState(null);
+  const [favoriteId, setFavoriteId] = useState(null);
+
+  const categoryLabel = (value) => {
+    const mapping = {
+      restaurant: "Food",
+      stay: "Stay",
+      generational_shop: "Shops",
+      hidden_gem: "Hidden Gems",
+      tourist_place: "Tourist",
+    };
+    return mapping[value] || value;
+  };
+
+  useEffect(() => {
+    if (!placeId) return;
+    fetchPlaceDetails(placeId)
+      .then((data) => setPlace(data))
+      .catch(() => setPlace(null));
+    fetchSavedPlaces()
+      .then((favorites) => {
+        const match = (favorites || []).find((f) => f.place_id === placeId);
+        setFavoriteId(match ? match.id : null);
+      })
+      .catch(() => setFavoriteId(null));
+  }, [placeId]);
+
+  const handleToggleSaved = async () => {
+    if (!placeId) return;
+    try {
+      if (favoriteId) {
+        await removeSavedPlace(favoriteId);
+        // Re-fetch to keep state consistent with server.
+        const favorites = await fetchSavedPlaces();
+        const match = (favorites || []).find((f) => f.place_id === placeId);
+        setFavoriteId(match ? match.id : null);
+      } else {
+        await savePlace(placeId);
+        const favorites = await fetchSavedPlaces();
+        const match = (favorites || []).find((f) => f.place_id === placeId);
+        setFavoriteId(match ? match.id : true);
+      }
+    } catch (e) {
+      console.warn("Failed to toggle saved:", e);
+      Alert.alert("Saved", e?.message || "Failed to save this place. Please try again.");
+    }
+  };
 
   return (
     <PageCard>
       <ScreenHeader title="Place Detail" onBack={() => navigation.goBack()} />
-      <Text style={styles.title}>Mysuru Silk House</Text>
-      <Text style={styles.meta}>Category: Shops • Rating: 4.5</Text>
+      <Text style={styles.title}>{place?.name || "Place Details"}</Text>
+      <Text style={styles.meta}>
+        Category: {categoryLabel(place?.category)} • Rating: {place?.avg_rating ?? "—"}
+      </Text>
+      {place?.address ? <Text style={styles.address}>{place.address}</Text> : null}
       <Text style={styles.desc}>
-        Family-run silk store with heritage craftsmanship and curated textiles.
+        {place?.description || "No description available yet."}
       </Text>
 
+      {place?.restaurant_details ? (
+        <View style={styles.detailsBox}>
+          <Text style={styles.detailsTitle}>Restaurant Details</Text>
+          {place.restaurant_details.cuisine ? <Text style={styles.detailsText}>Cuisine: {place.restaurant_details.cuisine}</Text> : null}
+          {place.restaurant_details.price_range ? <Text style={styles.detailsText}>Price: {place.restaurant_details.price_range}</Text> : null}
+          {place.restaurant_details.must_try ? <Text style={styles.detailsText}>Must try: {place.restaurant_details.must_try}</Text> : null}
+        </View>
+      ) : null}
+
+      {place?.stay_details ? (
+        <View style={styles.detailsBox}>
+          <Text style={styles.detailsTitle}>Stay Details</Text>
+          {place.stay_details.stay_type ? <Text style={styles.detailsText}>Type: {place.stay_details.stay_type}</Text> : null}
+          {place.stay_details.price_per_night !== null && place.stay_details.price_per_night !== undefined ? (
+            <Text style={styles.detailsText}>Price/night: {place.stay_details.price_per_night}</Text>
+          ) : null}
+          {place.stay_details.amenities?.length ? (
+            <Text style={styles.detailsText}>Amenities: {place.stay_details.amenities.join(", ")}</Text>
+          ) : null}
+        </View>
+      ) : null}
+
       <Text style={styles.section}>Photos</Text>
-      <PhotoPlaceholder label="Place photos (coming soon)" />
+      {place?.image_urls?.length ? (
+        <View style={styles.heroWrap}>
+          <Image
+            source={{ uri: toDisplayImageUrl(place.image_urls[0]) }}
+            style={styles.heroImage}
+            resizeMode="contain"
+          />
+        </View>
+      ) : (
+        <PhotoPlaceholder label="Place photos (coming soon)" />
+      )}
 
       <View style={styles.buttonContainer}>
-        <PrimaryButton label={isSaved ? "Remove from Saved" : "Save Place"} onPress={() => dispatch(toggleSaved(placeId))} />
+        <PrimaryButton
+          label={favoriteId ? "Remove from Saved" : "Save Place"}
+          onPress={handleToggleSaved}
+        />
         <PrimaryButton label="Add to Itinerary" onPress={() => navigation.navigate("DayPlan")} variant="ghost" />
         <PrimaryButton label="Get Directions" onPress={() => navigation.navigate("Map")} variant="ghost" />
-        <PrimaryButton label="Read Reviews" onPress={() => navigation.navigate("ReviewsList", { id: placeId })} variant="ghost" />
+        <PrimaryButton label="Read Reviews" onPress={() => navigation.navigate("ReviewsList", { id: placeId || placeParam })} variant="ghost" />
       </View>
     </PageCard>
   );
@@ -53,13 +139,48 @@ const styles = StyleSheet.create({
     lineHeight: 24,
     marginBottom: spacing.xl,
   },
+  address: {
+    ...typography.body,
+    color: colors.textSecondary,
+    marginBottom: spacing.md,
+  },
   section: {
     ...typography.h3,
     color: colors.text,
     marginBottom: spacing.md,
   },
+  heroWrap: {
+    width: "100%",
+    height: 260,
+    borderRadius: 16,
+    overflow: "hidden",
+    backgroundColor: colors.accent,
+    marginBottom: spacing.lg,
+  },
+  heroImage: {
+    width: "100%",
+    height: "100%",
+  },
   buttonContainer: {
     gap: spacing.md,
     marginTop: spacing.lg,
+  },
+  detailsBox: {
+    backgroundColor: colors.surface,
+    borderWidth: 1,
+    borderColor: colors.border,
+    borderRadius: 16,
+    padding: spacing.lg,
+    marginBottom: spacing.lg,
+  },
+  detailsTitle: {
+    ...typography.h3,
+    color: colors.text,
+    marginBottom: spacing.sm,
+  },
+  detailsText: {
+    ...typography.body,
+    color: colors.textSecondary,
+    marginBottom: spacing.xs,
   },
 });

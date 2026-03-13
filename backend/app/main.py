@@ -1,0 +1,33 @@
+from fastapi import FastAPI
+from fastapi.middleware.cors import CORSMiddleware
+
+from .config import settings
+from .routers import auth, districts, places, reviews, favorites, itineraries, uploads, files
+
+
+def create_app() -> FastAPI:
+    app = FastAPI(title=settings.APP_NAME)
+
+    origins = [origin.strip() for origin in settings.CORS_ORIGINS.split(",") if origin.strip()]
+    if origins:
+        app.add_middleware(
+            CORSMiddleware,
+            allow_origins=origins,
+            allow_credentials=True,
+            allow_methods=["*"],
+            allow_headers=["*"],
+        )
+
+    app.include_router(auth.router, prefix="/auth", tags=["Auth"])
+    app.include_router(districts.router, prefix="/districts", tags=["Districts"])
+    app.include_router(places.router, prefix="/places", tags=["Places"])
+    app.include_router(reviews.router, prefix="/reviews", tags=["Reviews"])
+    app.include_router(favorites.router, prefix="/favorites", tags=["Favorites"])
+    app.include_router(itineraries.router, tags=["Itineraries"])
+    app.include_router(uploads.router, tags=["Uploads"])
+    app.include_router(files.router, tags=["Files"])
+
+    return app
+
+
+app = create_app()

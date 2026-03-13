@@ -1,3 +1,4 @@
+import { useEffect, useState } from "react";
 import { View, Text, StyleSheet, ScrollView } from "react-native";
 import { useSelector } from "react-redux";
 import { colors } from "../theme/colors";
@@ -6,10 +7,29 @@ import { typography } from "../theme/typography";
 import SectionHeader from "../components/SectionHeader";
 import PageCard from "../components/PageCard";
 import PlaceCard from "../components/PlaceCard";
+import { fetchPlaces } from "../services/placesApi";
+import { toDisplayImageUrl } from "../services/mediaUrl";
 
 export default function HomeScreen({ navigation }) {
   const { role } = useSelector(state => state.auth);
-  const featured = useSelector(state => state.places.featured);
+  const [featured, setFeatured] = useState([]);
+
+  const categoryLabel = (value) => {
+    const mapping = {
+      restaurant: "Food",
+      stay: "Stay",
+      generational_shop: "Shops",
+      hidden_gem: "Hidden Gems",
+      tourist_place: "Tourist",
+    };
+    return mapping[value] || value;
+  };
+
+  useEffect(() => {
+    fetchPlaces()
+      .then((data) => setFeatured((data || []).slice(0, 6)))
+      .catch(() => setFeatured([]));
+  }, []);
 
   if (role === "admin") {
     const stats = [
@@ -56,7 +76,14 @@ export default function HomeScreen({ navigation }) {
       <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.featuredRow}>
         {featured.map((p) => (
           <View key={p.id} style={styles.featuredCardWrap}>
-            <PlaceCard name={p.name} category={p.category} distance={p.distance} rating={p.rating} />
+            <PlaceCard
+              name={p.name}
+              category={categoryLabel(p.category)}
+              distance={p.distance}
+              rating={p.avg_rating ?? p.rating}
+              imageUrl={toDisplayImageUrl(p.image_urls?.[0])}
+              onPress={() => navigation.navigate("PlaceDetail", { id: p.id })}
+            />
           </View>
         ))}
       </ScrollView>

@@ -2,6 +2,7 @@ import { useState, useEffect, useRef } from "react";
 import { View, Text, Pressable, StyleSheet, useWindowDimensions } from "react-native";
 import { useSelector, useDispatch } from "react-redux";
 import { logout } from "../store/slices/authSlice";
+import { clearAuthToken } from "../services/authStore";
 import { colors } from "../theme/colors";
 import { typography } from "../theme/typography";
 import { NavigationContainer, NavigationIndependentTree } from "@react-navigation/native";
@@ -36,6 +37,7 @@ const ADMIN_NAV = [
   { key: "Dashboard", label: "Overview", icon: "📊" },
   { key: "Approvals", label: "Approvals", icon: "✅" },
   { key: "Listings", label: "Manage Places", icon: "📍" },
+  { key: "SubmitPlace", label: "Add Place", icon: "➕" },
   { key: "Analytics", label: "Insights", icon: "📈" },
   { key: "Users", label: "Users", icon: "👥" },
   { key: "Settings", label: "Settings", icon: "⚙️" },
@@ -54,6 +56,7 @@ const ROUTE_TO_SECTION = {
   Dashboard: "Dashboard",
   Approvals: "Approvals",
   Listings: "Listings",
+  SubmitPlace: "SubmitPlace",
   Analytics: "Analytics",
   Users: "Users",
   Settings: "Settings",
@@ -108,7 +111,13 @@ export default function WebShell() {
         </View>
         <View style={styles.headerRight}>
           <Text style={styles.roleBadge}>{role?.toUpperCase()}</Text>
-          <Pressable onPress={() => dispatch(logout())} style={styles.logoutBtn}>
+          <Pressable
+            onPress={() => {
+              clearAuthToken();
+              dispatch(logout());
+            }}
+            style={styles.logoutBtn}
+          >
             <Text style={styles.logoutText}>Logout</Text>
           </Pressable>
         </View>
@@ -171,7 +180,13 @@ export default function WebShell() {
                     <Stack.Screen name="Profile" component={ProfileScreen} />
                   </>
                 )}
-                <Stack.Screen name="PlaceDetail" component={PlaceDetailScreen} />
+                <Stack.Screen
+                  name="PlaceDetail"
+                  component={PlaceDetailScreen}
+                  options={{ presentation: "modal", animation: "slide_from_bottom" }}
+                />
+                <Stack.Screen name="ReviewsList" component={ReviewsListScreen} />
+                <Stack.Screen name="ReviewSubmit" component={ReviewSubmitScreen} />
                 <Stack.Screen name="SubmitPlace" component={SubmitPlaceScreen} />
               </Stack.Navigator>
             </NavigationContainer>

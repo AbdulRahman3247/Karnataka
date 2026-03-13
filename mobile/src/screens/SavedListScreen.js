@@ -1,16 +1,36 @@
+import { useCallback, useEffect, useState } from "react";
 import { View, Text, StyleSheet } from "react-native";
-import { useSelector } from "react-redux";
+import { useFocusEffect } from "@react-navigation/native";
 import ScreenHeader from "../components/ScreenHeader";
 import PlaceCard from "../components/PlaceCard";
 import PageCard from "../components/PageCard";
 import { colors } from "../theme/colors";
 import { spacing } from "../theme/spacing";
 import { typography } from "../theme/typography";
+import { fetchSavedPlaceCards } from "../services/savedApi";
+import { toDisplayImageUrl } from "../services/mediaUrl";
 
 export default function SavedListScreen({ navigation }) {
-  const savedIds = useSelector((state) => state.saved.saved);
-  const places = useSelector((state) => state.places.places);
-  const savedPlaces = places.filter((p) => savedIds.includes(p.id));
+  const [savedPlaces, setSavedPlaces] = useState([]);
+
+  const load = useCallback(async () => {
+      try {
+        const places = await fetchSavedPlaceCards();
+        setSavedPlaces(places || []);
+      } catch (e) {
+        setSavedPlaces([]);
+      }
+    }, []);
+
+  useEffect(() => {
+    load();
+  }, [load]);
+
+  useFocusEffect(
+    useCallback(() => {
+      load();
+    }, [load])
+  );
 
   return (
     <PageCard>
@@ -21,7 +41,15 @@ export default function SavedListScreen({ navigation }) {
         </View>
       ) : (
         savedPlaces.map((p) => (
-          <PlaceCard key={p.id} name={p.name} category={p.category} distance={p.distance} rating={p.rating} />
+          <PlaceCard
+            key={p.id}
+            name={p.name}
+            category={p.category}
+            distance={p.distance}
+            rating={p.avg_rating ?? p.rating}
+            imageUrl={toDisplayImageUrl(p.image_urls?.[0])}
+            onPress={() => navigation.navigate("PlaceDetail", { id: p.id })}
+          />
         ))
       )}
     </PageCard>

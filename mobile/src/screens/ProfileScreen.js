@@ -1,13 +1,23 @@
+import { useEffect, useState } from "react";
 import { View, Text, StyleSheet } from "react-native";
 import { colors } from "../theme/colors";
 import { spacing } from "../theme/spacing";
 import { typography } from "../theme/typography";
 import PrimaryButton from "../components/PrimaryButton";
+import { clearAuthProfile, clearAuthToken, getAuthProfile } from "../services/authStore";
 
 import ScreenHeader from "../components/ScreenHeader";
 import PageCard from "../components/PageCard";
 
 export default function ProfileScreen({ navigation }) {
+  const [role, setRole] = useState(null);
+
+  useEffect(() => {
+    getAuthProfile()
+      .then((profile) => setRole(profile?.role || "user"))
+      .catch(() => setRole("user"));
+  }, []);
+
   return (
     <PageCard>
       <ScreenHeader title="Account Profile" onBack={() => navigation.goBack()} />
@@ -25,8 +35,23 @@ export default function ProfileScreen({ navigation }) {
       <View style={styles.spacer} />
       <PrimaryButton label="Notifications" onPress={() => navigation.navigate("Notifications", { title: "Notifications" })} variant="ghost" />
 
+      {role === "admin" ? (
+        <>
+          <View style={styles.spacer} />
+          <PrimaryButton label="Add Place" onPress={() => navigation.navigate("SubmitPlace")} />
+        </>
+      ) : null}
+
       <View style={styles.logoutSection}>
-        <PrimaryButton label="Logout" onPress={() => navigation.replace("Login")} variant="ghost" />
+        <PrimaryButton
+          label="Logout"
+          onPress={async () => {
+            await clearAuthToken();
+            await clearAuthProfile();
+            navigation.replace("Login");
+          }}
+          variant="ghost"
+        />
       </View>
     </PageCard>
   );

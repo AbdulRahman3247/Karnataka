@@ -1,0 +1,27 @@
+import os
+from typing import Optional
+
+from dotenv import load_dotenv
+
+load_dotenv()
+
+
+def get_env(name: str, default: Optional[str] = None) -> str:
+    value = os.getenv(name, default)
+    if value is None:
+        raise RuntimeError(f"Missing required environment variable: {name}")
+    return value
+
+
+class Settings:
+    ENV: str = os.getenv("ENV", "development")
+    APP_NAME: str = os.getenv("APP_NAME", "Incredible Karnataka")
+
+    SUPABASE_URL: str = get_env("SUPABASE_URL")
+    SUPABASE_ANON_KEY: str = get_env("SUPABASE_ANON_KEY")
+    SUPABASE_SERVICE_ROLE_KEY: Optional[str] = os.getenv("SUPABASE_SERVICE_ROLE_KEY")
+
+    CORS_ORIGINS: str = os.getenv("CORS_ORIGINS", "*")
+
+
+settings = Settings()

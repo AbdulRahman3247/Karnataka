@@ -1,24 +1,52 @@
-import { View, Text, StyleSheet, Platform } from "react-native";
+import { useState } from "react";
+import { View, Text, StyleSheet, Platform, Image, Pressable } from "react-native";
 import { colors } from "../theme/colors";
 import { spacing } from "../theme/spacing";
 import { typography } from "../theme/typography";
 
-export default function PlaceCard({ name, category, distance, rating }) {
+export default function PlaceCard({ name, category, distance, rating, imageUrl, onPress }) {
+  const [imageFailed, setImageFailed] = useState(false);
+  const distanceLabel =
+    distance === null || distance === undefined || distance === ""
+      ? "Distance unknown"
+      : `${distance} km away`;
+  const ratingLabel = rating === null || rating === undefined ? "—" : rating;
+
   return (
-    <View style={styles.card}>
+    <Pressable onPress={onPress} disabled={!onPress} style={styles.card}>
+      <View style={styles.imageWrap}>
+        {imageUrl && !imageFailed ? (
+          <Image
+            source={{ uri: imageUrl }}
+            style={styles.image}
+            resizeMode="contain"
+            onError={(e) => {
+              // Useful when storage URLs are private/expired or blocked by extensions.
+              console.warn("PlaceCard image failed:", imageUrl, e?.nativeEvent || e);
+              setImageFailed(true);
+            }}
+          />
+        ) : (
+          <View style={styles.imageFallback}>
+            <Text style={styles.imageFallbackText}>
+              {imageUrl ? "Image unavailable" : "No image"}
+            </Text>
+          </View>
+        )}
+      </View>
       <View style={styles.content}>
         <View style={styles.badge}>
           <Text style={styles.badgeText}>{category}</Text>
         </View>
         <Text style={styles.name}>{name}</Text>
         <View style={styles.footer}>
-          <Text style={styles.meta}>{distance} km away</Text>
+          <Text style={styles.meta}>{distanceLabel}</Text>
           <View style={styles.ratingContainer}>
-            <Text style={styles.ratingText}>★ {rating}</Text>
+            <Text style={styles.ratingText}>★ {ratingLabel}</Text>
           </View>
         </View>
       </View>
-    </View>
+    </Pressable>
   );
 }
 
@@ -27,6 +55,7 @@ const styles = StyleSheet.create({
     backgroundColor: colors.elevated,
     borderRadius: 20,
     marginBottom: spacing.lg,
+    overflow: "hidden",
     ...Platform.select({
       ios: {
         shadowColor: colors.shadow,
@@ -46,6 +75,27 @@ const styles = StyleSheet.create({
   },
   content: {
     padding: spacing.lg,
+  },
+  imageWrap: {
+    width: "100%",
+    height: 160,
+    backgroundColor: colors.accent,
+  },
+  image: {
+    width: "100%",
+    height: "100%",
+  },
+  imageFallback: {
+    width: "100%",
+    height: "100%",
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  imageFallbackText: {
+    ...typography.caption,
+    color: colors.textSecondary,
+    fontSize: 10,
+    fontWeight: "800",
   },
   badge: {
     backgroundColor: colors.accent,

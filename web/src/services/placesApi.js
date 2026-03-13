@@ -1,5 +1,12 @@
-import { apiGet, apiPost } from "./apiClient";
+import { apiDelete, apiGet, apiPost, apiPut } from "./apiClient";
 
-export const fetchNearbyPlaces = (lat, lng) => apiGet(`/places/nearby?lat=${lat}&lng=${lng}`);
+export const fetchPlaces = (params = {}) => {
+  const query = new URLSearchParams(params).toString();
+  return apiGet(query ? `/places?${query}` : "/places");
+};
+
+export const fetchNearbyPlaces = () => fetchPlaces();
 export const fetchPlaceDetails = (id) => apiGet(`/places/${id}`);
 export const submitPlace = (payload) => apiPost("/places", payload);
+export const updatePlace = (id, payload) => apiPut(`/places/${id}`, payload);
+export const deletePlace = (id) => apiDelete(`/places/${id}`);

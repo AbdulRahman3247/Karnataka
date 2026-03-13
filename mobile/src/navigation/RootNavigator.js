@@ -34,7 +34,11 @@ export default function RootNavigator() {
         <Stack.Screen name="SearchFilter" component={SearchFilterScreen} />
         <Stack.Screen name="DayPlan" component={DayPlanScreen} />
         <Stack.Screen name="SavedList" component={SavedListScreen} />
-        <Stack.Screen name="PlaceDetail" component={PlaceDetailScreen} />
+        <Stack.Screen
+          name="PlaceDetail"
+          component={PlaceDetailScreen}
+          options={{ presentation: "modal", animation: "slide_from_bottom" }}
+        />
         <Stack.Screen name="SubmitPlace" component={SubmitPlaceScreen} />
 
         <Stack.Screen name="ReviewsList" component={ReviewsListScreen} />

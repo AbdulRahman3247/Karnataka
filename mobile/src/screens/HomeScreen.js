@@ -1,4 +1,4 @@
-import { useEffect } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { View, Text, StyleSheet, ScrollView, StatusBar } from "react-native";
 import { useDispatch, useSelector } from "react-redux";
 import { colors } from "../theme/colors";
@@ -9,18 +9,38 @@ import SectionHeader from "../components/SectionHeader";
 import PlaceCard from "../components/PlaceCard";
 import PrimaryButton from "../components/PrimaryButton";
 import { loadRecommendations } from "../store/slices/recommendationsSlice";
+import { fetchPlaces } from "../services/placesApi";
+import { toDisplayImageUrl } from "../services/mediaUrl";
 
 import PageCard from "../components/PageCard";
 
 export default function HomeScreen({ navigation }) {
   const dispatch = useDispatch();
   const language = useSelector((state) => state.lang.language);
-  const categories = useSelector((state) => state.places.categories);
-  const featured = useSelector((state) => state.places.featured);
-  const allPlaces = useSelector((state) => state.places.places);
+  const [places, setPlaces] = useState([]);
+  const [status, setStatus] = useState("idle");
+
+  const categoryLabel = (value) => {
+    const mapping = {
+      restaurant: "Food",
+      stay: "Stay",
+      generational_shop: "Shops",
+      hidden_gem: "Hidden Gems",
+      tourist_place: "Tourist",
+    };
+    return mapping[value] || value;
+  };
+
+  const categories = useMemo(() => {
+    const unique = new Set(places.map((p) => p.category).filter(Boolean));
+    return Array.from(unique).map(categoryLabel);
+  }, [places]);
+
+  const featured = places.slice(0, 6);
+  const allPlaces = places;
   const recommendedIds = useSelector((state) => state.recommendations.recommended);
   const recStatus = useSelector((state) => state.recommendations.status);
-  const recommended = allPlaces.filter((p) => recommendedIds.includes(p.id));
+  const recommended = allPlaces.filter((p) => recommendedIds.includes(String(p.id)));
 
   const t = {
     en: {
@@ -54,6 +74,14 @@ export default function HomeScreen({ navigation }) {
     );
   }, [dispatch]);
 
+  useEffect(() => {
+    setStatus("loading");
+    fetchPlaces()
+      .then((data) => setPlaces(data || []))
+      .catch(() => setPlaces([]))
+      .finally(() => setStatus("idle"));
+  }, []);
+
   return (
     <PageCard hideHeader={false}>
       <StatusBar barStyle="dark-content" />
@@ -77,7 +105,14 @@ export default function HomeScreen({ navigation }) {
       <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.featuredRow}>
         {featured.map((p) => (
           <View key={p.id} style={styles.featuredCardWrap}>
-            <PlaceCard name={p.name} category={p.category} distance={p.distance} rating={p.rating} />
+            <PlaceCard
+              name={p.name}
+              category={categoryLabel(p.category)}
+              distance={p.distance}
+              rating={p.avg_rating ?? p.rating}
+              imageUrl={toDisplayImageUrl(p.image_urls?.[0])}
+              onPress={() => navigation.navigate("PlaceDetail", { id: p.id })}
+            />
           </View>
         ))}
       </ScrollView>
@@ -96,7 +131,15 @@ export default function HomeScreen({ navigation }) {
 
       <SectionHeader title="Recently Added" />
       {featured.slice(0, 3).map((p) => (
-        <PlaceCard key={p.id} name={p.name} category={p.category} distance={p.distance} rating={p.rating} />
+        <PlaceCard
+          key={p.id}
+          name={p.name}
+          category={categoryLabel(p.category)}
+          distance={p.distance}
+          rating={p.avg_rating ?? p.rating}
+          imageUrl={toDisplayImageUrl(p.image_urls?.[0])}
+          onPress={() => navigation.navigate("PlaceDetail", { id: p.id })}
+        />
       ))}
 
       <PrimaryButton

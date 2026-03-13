@@ -6,6 +6,7 @@ import { spacing } from "../theme/spacing";
 import { typography } from "../theme/typography";
 import CategoryChip from "../components/CategoryChip";
 import PrimaryButton from "../components/PrimaryButton";
+import { generateItinerary } from "../services/itinerariesApi";
 
 import ScreenHeader from "../components/ScreenHeader";
 import PageCard from "../components/PageCard";
@@ -15,6 +16,41 @@ export default function ItineraryScreen({ navigation }) {
   const [selected, setSelected] = useState([]);
   const [hours, setHours] = useState("6");
   const [distance, setDistance] = useState("25");
+  const [status, setStatus] = useState("idle");
+  const [error, setError] = useState("");
+
+  const mapCategory = (label) => {
+    const mapping = {
+      Food: "restaurant",
+      Stay: "stay",
+      Shops: "generational_shop",
+      "Hidden Gems": "hidden_gem",
+      Temples: "tourist_place",
+      Nature: "tourist_place",
+      "Historical Places": "tourist_place",
+      "Local Picks": "hidden_gem",
+    };
+    return mapping[label] || null;
+  };
+
+  const onGenerate = async () => {
+    setStatus("loading");
+    setError("");
+    const days = Math.max(1, Math.ceil((Number(hours) || 6) / 8));
+    const categories = selected.map(mapCategory).filter(Boolean);
+    try {
+      const data = await generateItinerary({
+        district_id: 1,
+        days,
+        categories: categories.length ? categories : null,
+      });
+      navigation.navigate("DayPlan", { plan: data.plan, days: data.days });
+    } catch (e) {
+      setError(e.message || "Failed to generate itinerary");
+    } finally {
+      setStatus("idle");
+    }
+  };
 
   const toggle = (c) => {
     setSelected((prev) =>
@@ -40,8 +76,12 @@ export default function ItineraryScreen({ navigation }) {
         ))}
       </View>
 
+      {error ? <Text style={styles.error}>{error}</Text> : null}
       <View style={styles.footer}>
-        <PrimaryButton label="Generate Personal Trip" onPress={() => navigation.navigate("DayPlan")} />
+        <PrimaryButton
+          label={status === "loading" ? "Generating..." : "Generate Personal Trip"}
+          onPress={onGenerate}
+        />
       </View>
     </PageCard>
   );
@@ -77,5 +117,10 @@ const styles = StyleSheet.create({
   },
   footer: {
     marginTop: spacing.md,
+  },
+  error: {
+    ...typography.body,
+    color: colors.error,
+    marginBottom: spacing.md,
   },
 });

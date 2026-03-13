@@ -1,5 +1,7 @@
-import { useState } from "react";
-import { View, Text, TextInput, StyleSheet } from "react-native";
+import { useEffect, useState } from "react";
+import { View, Text, TextInput, StyleSheet, ScrollView } from "react-native";
+import * as ImagePicker from "expo-image-picker";
+import * as Location from "expo-location";
 import ScreenHeader from "../components/ScreenHeader";
 import PrimaryButton from "../components/PrimaryButton";
 import PhotoPlaceholder from "../components/PhotoPlaceholder";
@@ -7,20 +9,210 @@ import PageCard from "../components/PageCard";
 import { colors } from "../theme/colors";
 import { spacing } from "../theme/spacing";
 import { typography } from "../theme/typography";
+import { submitPlace } from "../services/placesApi";
+import { getAuthProfile } from "../services/authStore";
+import { uploadPlaceImage } from "../services/uploadsApi";
+import { fetchDistricts } from "../services/districtsApi";
 
 export default function SubmitPlaceScreen({ navigation }) {
   const [name, setName] = useState("");
   const [category, setCategory] = useState("");
   const [description, setDescription] = useState("");
+  const [districtId, setDistrictId] = useState(null);
+  const [role, setRole] = useState(null);
+  const [status, setStatus] = useState("idle");
+  const [error, setError] = useState("");
+  const [imageAsset, setImageAsset] = useState(null);
+  const [imageUrl, setImageUrl] = useState("");
+  const [uploadStatus, setUploadStatus] = useState("idle");
+  const [locStatus, setLocStatus] = useState("idle");
+  const [address, setAddress] = useState("");
+  const [latitude, setLatitude] = useState("");
+  const [longitude, setLongitude] = useState("");
+  const [districts, setDistricts] = useState([]);
+  const [cuisine, setCuisine] = useState("");
+  const [priceRange, setPriceRange] = useState("");
+  const [mustTry, setMustTry] = useState("");
+  const [stayType, setStayType] = useState("");
+  const [pricePerNight, setPricePerNight] = useState("");
+  const [amenities, setAmenities] = useState("");
+
+  useEffect(() => {
+    getAuthProfile()
+      .then((profile) => setRole(profile?.role || "user"))
+      .catch(() => setRole("user"));
+  }, []);
+
+  useEffect(() => {
+    fetchDistricts()
+      .then((data) => setDistricts(data || []))
+      .catch(() => setDistricts([]));
+  }, []);
+
+  const normalizeCategory = (value) => {
+    const v = value.trim().toLowerCase();
+    const mapping = {
+      food: "restaurant",
+      restaurant: "restaurant",
+      stay: "stay",
+      shops: "generational_shop",
+      shop: "generational_shop",
+      "generational shop": "generational_shop",
+      tourist: "tourist_place",
+      "tourist place": "tourist_place",
+      "hidden gem": "hidden_gem",
+      hidden: "hidden_gem",
+    };
+    return mapping[v] || v;
+  };
+
+  const handleSubmit = async () => {
+    setStatus("loading");
+    setError("");
+    try {
+      if (!name || !category || !districtId) {
+        setError("Name, category, and district are required.");
+        setStatus("idle");
+        return;
+      }
+
+      const normalizedCategory = normalizeCategory(category);
+      const payload = {
+        name,
+        district_id: Number(districtId),
+        category: normalizedCategory,
+        description,
+        address,
+        latitude: latitude ? Number(latitude) : null,
+        longitude: longitude ? Number(longitude) : null,
+        image_urls: imageUrl ? [imageUrl] : [],
+      };
+
+      if (normalizedCategory === "restaurant") {
+        payload.restaurant_details = {
+          cuisine: cuisine || null,
+          price_range: priceRange || null,
+          must_try: mustTry || null,
+        };
+      }
+
+      if (normalizedCategory === "stay") {
+        payload.stay_details = {
+          stay_type: stayType || null,
+          price_per_night: pricePerNight ? Number(pricePerNight) : null,
+          amenities: amenities
+            ? amenities.split(",").map((a) => a.trim()).filter(Boolean)
+            : null,
+        };
+      }
+
+      await submitPlace({
+        ...payload,
+      });
+      navigation.goBack();
+    } catch (e) {
+      setError(e.message || "Failed to submit place");
+    } finally {
+      setStatus("idle");
+    }
+  };
+
+  const pickImage = async () => {
+    const permission = await ImagePicker.requestMediaLibraryPermissionsAsync();
+    if (permission.status !== "granted") {
+      setError("Photo permission is required.");
+      return;
+    }
+    const result = await ImagePicker.launchImageLibraryAsync({
+      mediaTypes: ImagePicker.MediaTypeOptions.Images,
+      quality: 0.8,
+    });
+    if (!result.canceled && result.assets?.length) {
+      setImageAsset(result.assets[0]);
+    }
+  };
+
+  const useCurrentLocation = async () => {
+    setLocStatus("loading");
+    setError("");
+    try {
+      const permission = await Location.requestForegroundPermissionsAsync();
+      if (permission.status !== "granted") {
+        setError("Location permission is required. Enable it in Settings and try again.");
+        return;
+      }
+
+      const provider = await Location.getProviderStatusAsync();
+      if (!provider.locationServicesEnabled) {
+        setError("Location services are turned off. Enable GPS/location services and try again.");
+        return;
+      }
+
+      const position = await Location.getCurrentPositionAsync({
+        accuracy: Location.Accuracy.Balanced,
+      });
+      setLatitude(String(position.coords.latitude));
+      setLongitude(String(position.coords.longitude));
+    } catch (e) {
+      setError(e?.message || "Unable to fetch location.");
+    } finally {
+      setLocStatus("idle");
+    }
+  };
+
+  const uploadImage = async () => {
+    if (!imageAsset) return;
+    setUploadStatus("uploading");
+    setError("");
+    try {
+      const res = await uploadPlaceImage(imageAsset);
+      setImageUrl(res.public_url);
+    } catch (e) {
+      setError(e.message || "Upload failed");
+    } finally {
+      setUploadStatus("idle");
+    }
+  };
+
+  if (role && role !== "admin") {
+    return (
+      <PageCard>
+        <ScreenHeader title="Admin Only" onBack={() => navigation.goBack()} />
+        <Text style={styles.text}>Only admins can add places.</Text>
+      </PageCard>
+    );
+  }
 
   return (
     <PageCard>
-      <ScreenHeader title="Suggest a Place" onBack={() => navigation.goBack()} />
-      <View style={styles.content}>
+      <ScreenHeader title="Add a Place" onBack={() => navigation.goBack()} />
+      <ScrollView style={styles.content}>
         <Text style={styles.label}>Place name</Text>
         <TextInput value={name} onChangeText={setName} style={styles.input} />
         <Text style={styles.label}>Category</Text>
         <TextInput value={category} onChangeText={setCategory} style={styles.input} />
+        <Text style={styles.label}>District</Text>
+        <View style={styles.row}>
+          {districts.map((d) => (
+            <PrimaryButton
+              key={d.id}
+              label={d.name}
+              onPress={() => setDistrictId(d.id)}
+              variant={districtId === d.id ? "primary" : "ghost"}
+            />
+          ))}
+        </View>
+        <Text style={styles.label}>Address</Text>
+        <TextInput value={address} onChangeText={setAddress} style={styles.input} />
+        <Text style={styles.label}>Latitude</Text>
+        <TextInput value={latitude} onChangeText={setLatitude} style={styles.input} keyboardType="numeric" />
+        <Text style={styles.label}>Longitude</Text>
+        <TextInput value={longitude} onChangeText={setLongitude} style={styles.input} keyboardType="numeric" />
+        <PrimaryButton
+          label={locStatus === "loading" ? "Fetching..." : "Use My Location"}
+          onPress={useCurrentLocation}
+          variant="ghost"
+        />
         <Text style={styles.label}>Description</Text>
         <TextInput
           value={description}
@@ -28,10 +220,48 @@ export default function SubmitPlaceScreen({ navigation }) {
           style={[styles.input, styles.textArea]}
           multiline
         />
+
+        {normalizeCategory(category) === "restaurant" ? (
+          <>
+            <Text style={styles.label}>Cuisine</Text>
+            <TextInput value={cuisine} onChangeText={setCuisine} style={styles.input} />
+            <Text style={styles.label}>Price Range</Text>
+            <TextInput value={priceRange} onChangeText={setPriceRange} style={styles.input} />
+            <Text style={styles.label}>Must Try</Text>
+            <TextInput value={mustTry} onChangeText={setMustTry} style={styles.input} />
+          </>
+        ) : null}
+
+        {normalizeCategory(category) === "stay" ? (
+          <>
+            <Text style={styles.label}>Stay Type</Text>
+            <TextInput value={stayType} onChangeText={setStayType} style={styles.input} />
+            <Text style={styles.label}>Price Per Night</Text>
+            <TextInput value={pricePerNight} onChangeText={setPricePerNight} style={styles.input} keyboardType="numeric" />
+            <Text style={styles.label}>Amenities (comma separated)</Text>
+            <TextInput value={amenities} onChangeText={setAmenities} style={styles.input} />
+          </>
+        ) : null}
+
         <Text style={styles.label}>Upload photos</Text>
         <PhotoPlaceholder label="Add photos (coming soon)" />
-        <PrimaryButton label="Submit for Approval" onPress={() => navigation.goBack()} />
-      </View>
+        <PrimaryButton
+          label={imageAsset ? "Select Another Photo" : "Select Photo"}
+          onPress={pickImage}
+          variant="ghost"
+        />
+        <PrimaryButton
+          label={uploadStatus === "uploading" ? "Uploading..." : "Upload Photo"}
+          onPress={uploadImage}
+          variant="ghost"
+        />
+        {imageUrl ? <Text style={styles.helper}>Uploaded: {imageUrl}</Text> : null}
+        {error ? <Text style={styles.error}>{error}</Text> : null}
+        <PrimaryButton
+          label={status === "loading" ? "Submitting..." : "Submit Place"}
+          onPress={handleSubmit}
+        />
+      </ScrollView>
     </PageCard>
   );
 }
@@ -55,5 +285,26 @@ const styles = StyleSheet.create({
   textArea: {
     height: 110,
     textAlignVertical: "top",
+  },
+  error: {
+    ...typography.body,
+    color: colors.error,
+    marginBottom: spacing.md,
+  },
+  helper: {
+    ...typography.body,
+    color: colors.textSecondary,
+    marginBottom: spacing.md,
+  },
+  row: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    gap: spacing.sm,
+    marginBottom: spacing.md,
+  },
+  text: {
+    ...typography.body,
+    color: colors.textSecondary,
+    marginTop: spacing.lg,
   },
 });

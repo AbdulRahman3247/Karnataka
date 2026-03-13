@@ -10,10 +10,12 @@ import { spacing } from "../theme/spacing";
 import { typography } from "../theme/typography";
 import { addReview } from "../store/slices/reviewsSlice";
 import { analyzeSentiment } from "../services/sentimentApi";
+import { submitReview } from "../services/reviewsApi";
 
 export default function ReviewSubmitScreen({ navigation, route }) {
   const dispatch = useDispatch();
-  const placeId = route?.params?.id || "p3";
+  const placeParam = route?.params?.id;
+  const placeId = Number.isFinite(Number(placeParam)) ? Number(placeParam) : null;
   const [rating, setRating] = useState("5");
   const [text, setText] = useState("");
   const [status, setStatus] = useState("idle");
@@ -29,9 +31,21 @@ export default function ReviewSubmitScreen({ navigation, route }) {
       setSentimentLabel("Unknown");
     }
 
+    if (placeId) {
+      try {
+        await submitReview({
+          place_id: placeId,
+          rating: Number(rating) || 0,
+          comment: text || "",
+        });
+      } catch (e) {
+        // keep local fallback if API fails
+      }
+    }
+
     dispatch(
       addReview({
-        placeId,
+        placeId: placeId || placeParam || "local",
         review: {
           id: `r${Date.now()}`,
           user: "You",

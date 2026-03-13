@@ -1,0 +1,11 @@
+import { apiUpload } from "./apiClient";
+
+export const uploadPlaceImage = async (asset) => {
+  const formData = new FormData();
+  formData.append("file", {
+    uri: asset.uri,
+    name: asset.fileName || asset.name || "place.jpg",
+    type: asset.mimeType || asset.type || "image/jpeg",
+  });
+  return apiUpload("/uploads/place-image", formData);
+};
