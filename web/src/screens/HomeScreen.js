@@ -172,7 +172,7 @@ const styles = StyleSheet.create({
   sectionLabel: { fontSize: 12, fontWeight: "900", color: colors.textMuted, letterSpacing: 1.5, marginBottom: 16 },
   seeAll: { fontSize: 14, fontWeight: "700", color: colors.primary },
 
-  featureCard: { width: Platform.OS === 'web' ? '100%' : 500, maxWidth: 500, height: 280, borderRadius: 24, overflow: "hidden" },
+  featureCard: { width: 500, height: 280, borderRadius: 24, overflow: "hidden" },
   featureImage: { width: "100%", height: "100%" },
   featureOverlay: { ...StyleSheet.absoluteFillObject, backgroundColor: 'rgba(0,0,0,0.3)', padding: 30, justifyContent: "flex-end" },
   featureBadge: { backgroundColor: colors.primary, alignSelf: "flex-start", paddingHorizontal: 10, paddingVertical: 4, borderRadius: 6, marginBottom: 12 },
